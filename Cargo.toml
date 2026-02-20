@@ -1,3 +1,7 @@
+[workspace]
+members = ["demo-wasm"]
+resolver = "3"
+
 [package]
 name = "wavfc"
 version = "0.1.0"

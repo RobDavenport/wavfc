@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>wavfc -- Wave Function Collapse Demo</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>wavfc</h1>
+        <p class="subtitle">Dimension-agnostic Wave Function Collapse</p>
+    </header>
+
+    <main>
+        <div class="controls">
+            <div class="control-group">
+                <label for="tileset">Tileset</label>
+                <select id="tileset">
+                    <option value="terrain">Terrain</option>
+                    <option value="dungeon">Dungeon</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Grid Size</label>
+                <div class="size-inputs">
+                    <input type="number" id="width" value="32" min="4" max="128">
+                    <span>&times;</span>
+                    <input type="number" id="height" value="32" min="4" max="128">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label for="seed">Seed</label>
+                <div class="seed-row">
+                    <input type="number" id="seed" value="42">
+                    <button id="random-seed" title="Random seed">Random</button>
+                </div>
+            </div>
+
+            <div class="control-group checkbox-group">
+                <label for="wrapping">Wrapping (Toroidal)</label>
+                <input type="checkbox" id="wrapping">
+            </div>
+
+            <div class="control-group">
+                <label for="propagator">Propagator</label>
+                <select id="propagator">
+                    <option value="ac3">AC-3 (low memory)</option>
+                    <option value="ac4">AC-4 (fast)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="heuristic">Heuristic</label>
+                <select id="heuristic">
+                    <option value="min_count">Minimum Count</option>
+                    <option value="shannon">Shannon Entropy</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="backtrack">Backtracking</label>
+                <select id="backtrack">
+                    <option value="none">None</option>
+                    <option value="restart">Restart</option>
+                    <option value="chronological">Chronological</option>
+                </select>
+                <input type="number" id="backtrack-param" value="10" min="1" max="100" class="hidden" placeholder="Max retries">
+            </div>
+
+            <div class="control-group">
+                <label for="auto-speed">Auto-Play Speed</label>
+                <div class="speed-row">
+                    <input type="range" id="auto-speed" min="1" max="100" value="50">
+                    <span id="speed-label">50 steps/frame</span>
+                </div>
+            </div>
+
+            <div class="buttons">
+                <button id="generate" class="primary">Generate</button>
+                <button id="step-start">Step Through</button>
+                <button id="step-next" disabled>Next Step</button>
+                <button id="step-auto" disabled>Auto Play</button>
+            </div>
+
+            <div id="message" class="message hidden"></div>
+
+            <div class="stats" id="stats"></div>
+
+            <div class="legend" id="legend"></div>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+        </div>
+    </main>
+
+    <footer>
+        <p>Built with <a href="https://github.com/nethercore/wavfc">wavfc</a> -- a no_std Rust WFC library compiled to WebAssembly</p>
+    </footer>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
