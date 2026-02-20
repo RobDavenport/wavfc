@@ -54,7 +54,7 @@ impl Ac3Propagator {
         while let Some((cell, _removed_state)) = self.stack.pop() {
             // For each neighbor of the changed cell
             for (neighbor, dir) in topo.neighbors(cell) {
-                let opp_dir_idx = topo.direction_index(topo.opposite(dir));
+                let dir_idx = topo.direction_index(dir);
 
                 // Compute the support set: what states are compatible with
                 // the current possibilities of `cell` when viewed from `neighbor`?
@@ -62,8 +62,10 @@ impl Ac3Propagator {
                 for s in possibilities[cell].iter_ones() {
                     // s is a state still possible in `cell`.
                     // For each such state, what states does it allow in `neighbor`
-                    // when looking from neighbor toward cell (opposite direction)?
-                    support |= *compat.compatible_states(s, opp_dir_idx);
+                    // in direction `dir` from `cell`?
+                    // compatible(s, t, dir) means "s can have t in direction dir",
+                    // which is equivalent to "t can have s in opposite(dir)".
+                    support |= *compat.compatible_states(s, dir_idx);
                 }
 
                 // Restrict neighbor's possibilities to the support set
