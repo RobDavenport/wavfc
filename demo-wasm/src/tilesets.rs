@@ -495,3 +495,130 @@ pub fn voxel_village_name(state: usize) -> &'static str {
         _ => "Unknown",
     }
 }
+
+// ===========================================================================
+// Time-as-Dimension tileset
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Time Evolution tileset (6 states)
+// ---------------------------------------------------------------------------
+//
+// Uses Grid3D where Z-axis represents time.
+//
+// 0: Empty       (#D7CCC8)
+// 1: Grass       (#66BB6A)
+// 2: YoungForest (#43A047)
+// 3: OldForest   (#1B5E20)
+// 4: Fire        (#FF6F00)
+// 5: Ash         (#616161)
+//
+// Spatial rules (N/S/E/W) are symmetric: similar biomes can be adjacent.
+// Time rules (Up/Down) are asymmetric: Up = forward in time, Down = backward.
+
+pub struct TimeEvolutionRules;
+
+impl TimeEvolutionRules {
+    fn is_horizontal(dir: Dir3D) -> bool {
+        matches!(dir, Dir3D::North | Dir3D::South | Dir3D::East | Dir3D::West)
+    }
+
+    /// Forward-in-time evolution: can state `a` (now) evolve into state `b` (next)?
+    fn can_evolve(a: usize, b: usize) -> bool {
+        match a {
+            0 => matches!(b, 0 | 1),            // Empty -> Empty or Grass
+            1 => matches!(b, 1 | 2),            // Grass -> Grass or YoungForest
+            2 => matches!(b, 2 | 3),            // YoungForest -> YoungForest or OldForest
+            3 => matches!(b, 3 | 4),            // OldForest -> OldForest or Fire
+            4 => b == 5,                         // Fire -> Ash
+            5 => matches!(b, 5 | 1),            // Ash -> Ash or Grass (regrowth)
+            _ => false,
+        }
+    }
+}
+
+impl AdjacencyRules for TimeEvolutionRules {
+    type Direction = Dir3D;
+
+    fn num_states(&self) -> usize {
+        6
+    }
+
+    fn compatible(&self, a: usize, b: usize, dir: Dir3D) -> bool {
+        if Self::is_horizontal(dir) {
+            // Spatial rules: symmetric, direction-independent
+            let (lo, hi) = (a.min(b), a.max(b));
+            matches!(
+                (lo, hi),
+                // Self-adjacency for all states
+                (0, 0) | (1, 1) | (2, 2) | (3, 3) | (4, 4) | (5, 5)
+                // Empty <-> Grass
+                | (0, 1)
+                // Grass <-> YoungForest
+                | (1, 2)
+                // YoungForest <-> OldForest
+                | (2, 3)
+                // Ash <-> Empty
+                | (0, 5)
+                // Ash <-> Grass
+                | (1, 5)
+                // Fire <-> OldForest
+                | (3, 4)
+                // Fire <-> Ash
+                | (4, 5)
+                // Empty <-> YoungForest (clearings near young forests)
+                | (0, 2)
+            )
+        } else {
+            // Time rules: asymmetric
+            // Up = forward in time: a is now, b is next
+            // Down = backward in time: a is next, b is now
+            if dir == Dir3D::Up {
+                Self::can_evolve(a, b)
+            } else {
+                // dir == Down: b is "now", a is "next"
+                Self::can_evolve(b, a)
+            }
+        }
+    }
+
+    fn weight(&self, state: usize) -> f64 {
+        match state {
+            0 => 1.0,  // Empty
+            1 => 3.0,  // Grass
+            2 => 2.0,  // YoungForest
+            3 => 1.0,  // OldForest
+            4 => 0.3,  // Fire
+            5 => 0.5,  // Ash
+            _ => 1.0,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Time Evolution color and name helpers
+// ---------------------------------------------------------------------------
+
+pub fn time_evolution_color(state: usize) -> &'static str {
+    match state {
+        0 => "#D7CCC8", // Empty
+        1 => "#66BB6A", // Grass
+        2 => "#43A047", // YoungForest
+        3 => "#1B5E20", // OldForest
+        4 => "#FF6F00", // Fire
+        5 => "#616161", // Ash
+        _ => "#000000",
+    }
+}
+
+pub fn time_evolution_name(state: usize) -> &'static str {
+    match state {
+        0 => "Empty",
+        1 => "Grass",
+        2 => "Young Forest",
+        3 => "Old Forest",
+        4 => "Fire",
+        5 => "Ash",
+        _ => "Unknown",
+    }
+}

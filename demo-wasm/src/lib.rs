@@ -8,7 +8,7 @@ mod tilesets;
 mod topology_2d;
 mod topology_3d;
 
-use tilesets::{DungeonRules, ForestVoxelRules, TerrainRules, TerrainVoxelRules, VillageVoxelRules};
+use tilesets::{DungeonRules, ForestVoxelRules, TerrainRules, TerrainVoxelRules, TimeEvolutionRules, VillageVoxelRules};
 use topology_2d::Grid2D;
 use topology_3d::Grid3D;
 
@@ -345,6 +345,15 @@ pub fn generate_3d(
                 .map_err(|e| JsValue::from_str(&format!("{e}")))?;
             Ok(result.states().iter().map(|&s| s as u8).collect())
         }
+        "time_evolution" => {
+            let rules = TimeEvolutionRules;
+            let mut solver = WfcSolver::new(grid, &rules, config)
+                .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+            let result = solver
+                .solve(&mut rng)
+                .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+            Ok(result.states().iter().map(|&s| s as u8).collect())
+        }
         _ => {
             // terrain_3d
             let rules = TerrainVoxelRules;
@@ -413,6 +422,7 @@ enum SolverVariant3D {
     Terrain(WfcSolver<Grid3D>),
     Forest(WfcSolver<Grid3D>),
     Village(WfcSolver<Grid3D>),
+    TimeEvolution(WfcSolver<Grid3D>),
 }
 
 #[wasm_bindgen]
@@ -472,6 +482,12 @@ impl StepSolver3D {
                     .map_err(|e| JsValue::from_str(&format!("{e}")))?;
                 SolverVariant3D::Village(solver)
             }
+            "time_evolution" => {
+                let rules = TimeEvolutionRules;
+                let solver = WfcSolver::new(grid, &rules, config)
+                    .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+                SolverVariant3D::TimeEvolution(solver)
+            }
             _ => {
                 let rules = TerrainVoxelRules;
                 let solver = WfcSolver::new(grid, &rules, config)
@@ -496,6 +512,7 @@ impl StepSolver3D {
             SolverVariant3D::Terrain(s) => s.step(&mut self.rng),
             SolverVariant3D::Forest(s) => s.step(&mut self.rng),
             SolverVariant3D::Village(s) => s.step(&mut self.rng),
+            SolverVariant3D::TimeEvolution(s) => s.step(&mut self.rng),
         };
         match result {
             StepResult::Collapsed { cell, state } => {
@@ -517,6 +534,7 @@ impl StepSolver3D {
         match self.tileset.as_str() {
             "forest" => tilesets::voxel_forest_color(state as usize).to_string(),
             "village" => tilesets::voxel_village_color(state as usize).to_string(),
+            "time_evolution" => tilesets::time_evolution_color(state as usize).to_string(),
             _ => tilesets::voxel_terrain_color(state as usize).to_string(),
         }
     }
@@ -525,6 +543,7 @@ impl StepSolver3D {
         match self.tileset.as_str() {
             "forest" => tilesets::voxel_forest_name(state as usize).to_string(),
             "village" => tilesets::voxel_village_name(state as usize).to_string(),
+            "time_evolution" => tilesets::time_evolution_name(state as usize).to_string(),
             _ => tilesets::voxel_terrain_name(state as usize).to_string(),
         }
     }
@@ -545,6 +564,7 @@ impl StepSolver3D {
         match self.tileset.as_str() {
             "forest" => 8,
             "village" => 11,
+            "time_evolution" => 6,
             _ => 6,
         }
     }
@@ -579,6 +599,7 @@ pub fn get_voxel_color(tileset: &str, state: u8) -> String {
     match tileset {
         "forest" => tilesets::voxel_forest_color(state as usize).to_string(),
         "village" => tilesets::voxel_village_color(state as usize).to_string(),
+        "time_evolution" => tilesets::time_evolution_color(state as usize).to_string(),
         _ => tilesets::voxel_terrain_color(state as usize).to_string(),
     }
 }
@@ -588,6 +609,7 @@ pub fn get_voxel_name(tileset: &str, state: u8) -> String {
     match tileset {
         "forest" => tilesets::voxel_forest_name(state as usize).to_string(),
         "village" => tilesets::voxel_village_name(state as usize).to_string(),
+        "time_evolution" => tilesets::time_evolution_name(state as usize).to_string(),
         _ => tilesets::voxel_terrain_name(state as usize).to_string(),
     }
 }
@@ -597,6 +619,7 @@ pub fn get_voxel_num_states(tileset: &str) -> usize {
     match tileset {
         "forest" => 8,
         "village" => 11,
+        "time_evolution" => 6,
         _ => 6,
     }
 }
@@ -608,6 +631,7 @@ pub fn get_num_states(tileset: &str) -> usize {
         "terrain_3d" => 6,
         "forest" => 8,
         "village" => 11,
+        "time_evolution" => 6,
         _ => 7,
     }
 }
