@@ -341,7 +341,7 @@ impl RotationExpander {
 
                 // Dedup: skip if we already have an identical socket array for
                 // this base tile.
-                let duplicate = seen.iter().any(|s| *s == transformed);
+                let duplicate = seen.contains(&transformed);
                 if duplicate {
                     continue;
                 }

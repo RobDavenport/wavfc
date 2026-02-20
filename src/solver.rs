@@ -762,7 +762,7 @@ impl<T: Topology, const W: usize> WfcSolver<T, W> {
         // Update collapsed count after constraints may have changed things
         self.collapsed_count = 0;
         for e in self.entropy_cache.iter() {
-            if *e <= 1 {
+            if *e == 1 {
                 self.collapsed_count += 1;
             }
         }
