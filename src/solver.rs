@@ -164,6 +164,62 @@ impl<T: Topology, const W: usize> WfcSolver<T, W> {
         Ok(solver)
     }
 
+    /// Restricts a cell's possibilities to only the states in `allowed`.
+    ///
+    /// Any states currently possible for the cell that are **not** in `allowed`
+    /// are removed, and the change is propagated through the constraint network.
+    ///
+    /// If `allowed` is a superset of the cell's current possibilities, this is
+    /// a no-op and returns `Ok(())`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WfcError::InvalidPin`] if `cell` is out of bounds.
+    /// Returns [`WfcError::Contradiction`] if the restriction leaves zero
+    /// possible states, or if propagation leads to a contradiction.
+    pub fn restrict(&mut self, cell: usize, allowed: &BitSet<W>) -> Result<(), WfcError<W>> {
+        if cell >= self.topo.num_cells() {
+            return Err(WfcError::InvalidPin { cell, state: 0 });
+        }
+
+        // Compute which states will be removed
+        let removed = self.possibilities[cell].and_not(allowed);
+        if removed.is_empty() {
+            return Ok(()); // No change needed
+        }
+
+        // Apply the restriction
+        let was_collapsed = self.entropy_cache[cell] <= 1;
+        self.possibilities[cell] &= *allowed;
+        let new_count = self.possibilities[cell].count_ones();
+
+        if new_count == 0 {
+            return Err(WfcError::Contradiction {
+                contradiction: Contradiction { cell },
+                partial_state: self.possibilities.clone(),
+                backtrack_depth: 0,
+            });
+        }
+
+        // Update entropy cache
+        self.entropy_cache[cell] = new_count;
+
+        // If newly collapsed (count == 1 and wasn't before), increment collapsed_count
+        if new_count == 1 && !was_collapsed {
+            self.collapsed_count += 1;
+        }
+
+        // Build removal list from removed states
+        let removals: Vec<(usize, usize)> = removed.iter_ones().map(|s| (cell, s)).collect();
+
+        // Propagate
+        self.propagate_from(&removals).map_err(|c| WfcError::Contradiction {
+            contradiction: c,
+            partial_state: self.possibilities.clone(),
+            backtrack_depth: 0,
+        })
+    }
+
     /// Pins a cell to a single state.
     ///
     /// All other states are removed and the change is propagated.
@@ -181,28 +237,12 @@ impl<T: Topology, const W: usize> WfcSolver<T, W> {
             return Err(WfcError::InvalidPin { cell, state });
         }
 
-        // Collect removed states
-        let old = self.possibilities[cell];
-        let mut only = BitSet::<W>::new();
-        only.set(state);
-        self.possibilities[cell] = only;
+        // Build a singleton mask with only the target state set
+        let mut mask = BitSet::<W>::new();
+        mask.set(state);
 
-        let was_collapsed = self.entropy_cache[cell] <= 1;
-        self.entropy_cache[cell] = 1;
-        if !was_collapsed {
-            self.collapsed_count += 1;
-        }
-
-        // Build removal list
-        let removed = old.and_not(&only);
-        let removals: Vec<(usize, usize)> = removed.iter_ones().map(|s| (cell, s)).collect();
-
-        // Propagate
-        self.propagate_from(&removals).map_err(|c| WfcError::Contradiction {
-            contradiction: c,
-            partial_state: self.possibilities.clone(),
-            backtrack_depth: 0,
-        })
+        // Delegate to restrict()
+        self.restrict(cell, &mask)
     }
 
     /// Runs the full solve loop with no observer and no global constraints.
