@@ -34,7 +34,9 @@ pub mod entropy;
 pub mod propagator;
 pub mod backtrack;
 pub mod config;
+pub mod path_constraint;
 pub mod solver;
+pub mod socket;
 
 // Re-export primary API
 pub use bitset::{BitSet, BitSet128, BitSet256};
@@ -47,4 +49,6 @@ pub use entropy::Heuristic;
 pub use propagator::PropagatorKind;
 pub use backtrack::BacktrackStrategy;
 pub use config::SolverConfig;
+pub use path_constraint::PathConstraint;
 pub use solver::{WfcSolver, SolveResult, StepResult};
+pub use socket::{Socket, SocketRuleBuilder, SocketRules, sockets_match};
