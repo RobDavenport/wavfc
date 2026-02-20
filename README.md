@@ -5,6 +5,8 @@ A generic, dimension-agnostic Wave Function Collapse library for Rust.
 [![no_std](https://img.shields.io/badge/no__std-compatible-green.svg)](https://doc.rust-lang.org/reference/names/preludes.html#the-no_std-attribute)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](#license)
 
+**[Live Demo](https://robdavenport.github.io/wavfc/)** -- try it in your browser (compiled to WebAssembly)
+
 ## Overview
 
 **wavfc** implements the [Wave Function Collapse](https://github.com/mxgmn/WaveFunctionCollapse)
