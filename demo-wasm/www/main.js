@@ -6,7 +6,7 @@ import init, {
     get_terrain_name,
     get_dungeon_name,
     get_num_states,
-} from '../pkg/wavfc_demo.js';
+} from './pkg/wavfc_demo.js';
 
 // ---------------------------------------------------------------------------
 // Color / name lookup tables (hardcoded to match Rust side)
@@ -79,7 +79,7 @@ function readParams() {
     return {
         width:      Math.max(4, Math.min(128, parseInt(elWidth.value, 10) || 32)),
         height:     Math.max(4, Math.min(128, parseInt(elHeight.value, 10) || 32)),
-        seed:       parseInt(elSeed.value, 10) || 0,
+        seed:       BigInt(parseInt(elSeed.value, 10) || 0),
         tileset:    elTileset.value,
         wrapping:   elWrapping.checked,
         propagator: elPropagator.value,
