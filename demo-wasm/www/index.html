@@ -15,10 +15,27 @@
     <main>
         <div class="controls">
             <div class="control-group">
+                <label for="mode">Mode</label>
+                <select id="mode">
+                    <option value="2d">2D Grid</option>
+                    <option value="3d">3D Voxel</option>
+                </select>
+            </div>
+
+            <div class="control-group mode-2d-only">
                 <label for="tileset">Tileset</label>
                 <select id="tileset">
                     <option value="terrain">Terrain</option>
                     <option value="dungeon">Dungeon</option>
+                </select>
+            </div>
+
+            <div class="control-group mode-3d-only hidden">
+                <label for="tileset-3d">3D Tileset</label>
+                <select id="tileset-3d">
+                    <option value="terrain_3d">Terrain</option>
+                    <option value="forest">Forest</option>
+                    <option value="village">Village</option>
                 </select>
             </div>
 
@@ -29,6 +46,11 @@
                     <span>&times;</span>
                     <input type="number" id="height" value="32" min="4" max="128">
                 </div>
+            </div>
+
+            <div class="control-group mode-3d-only hidden">
+                <label for="depth">Depth (Z layers)</label>
+                <input type="number" id="depth" value="12" min="4" max="32">
             </div>
 
             <div class="control-group">
@@ -73,8 +95,16 @@
             <div class="control-group">
                 <label for="auto-speed">Auto-Play Speed</label>
                 <div class="speed-row">
-                    <input type="range" id="auto-speed" min="1" max="100" value="50">
-                    <span id="speed-label">50 steps/frame</span>
+                    <input type="range" id="auto-speed" min="1" max="109" value="10">
+                    <span id="speed-label">1 step/frame</span>
+                </div>
+            </div>
+
+            <div class="control-group mode-3d-only hidden" id="layer-control">
+                <label for="layer-slice">Layer Slice</label>
+                <div class="speed-row">
+                    <input type="range" id="layer-slice" min="0" max="31" value="31">
+                    <span id="layer-label">All</span>
                 </div>
             </div>
 
@@ -90,15 +120,21 @@
             <div class="stats" id="stats"></div>
 
             <div class="legend" id="legend"></div>
+
+            <details class="how-it-works" id="how-it-works">
+                <summary>How It Works</summary>
+                <div id="how-it-works-content"></div>
+            </details>
         </div>
 
         <div class="canvas-container">
-            <canvas id="canvas"></canvas>
+            <canvas id="canvas" class="mode-2d-only"></canvas>
+            <div id="three-container" class="mode-3d-only hidden"></div>
         </div>
     </main>
 
     <footer>
-        <p>Built with <a href="https://github.com/nethercore/wavfc">wavfc</a> -- a no_std Rust WFC library compiled to WebAssembly</p>
+        <p>Built with <a href="https://github.com/robdavenport/wavfc">wavfc</a> -- a no_std Rust WFC library compiled to WebAssembly</p>
     </footer>
 
     <script type="module" src="main.js"></script>

@@ -443,3 +443,173 @@ footer a:hover {
         padding: 0.5rem;
     }
 }
+
+/* === 3D Container === */
+#three-container {
+    width: 100%;
+    height: 100%;
+    min-height: 500px;
+    position: relative;
+}
+
+#three-container canvas {
+    display: block;
+    border-radius: var(--radius-lg);
+}
+
+.three-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+    z-index: 10;
+    border-radius: var(--radius-lg);
+}
+
+.three-overlay.hidden {
+    display: none;
+}
+
+.three-overlay-text {
+    color: var(--text-primary);
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-align: center;
+    padding: 1.5rem 2rem;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+}
+
+.three-overlay-text small {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+    display: block;
+    margin-top: 0.3rem;
+}
+
+.three-hints {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: var(--radius);
+    z-index: 10;
+    white-space: nowrap;
+    pointer-events: none;
+    transition: opacity 0.5s;
+}
+
+.three-hints.three-hints-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* === How It Works === */
+.how-it-works {
+    margin-top: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.how-it-works summary {
+    padding: 0.6rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    background: var(--bg-surface);
+    user-select: none;
+}
+
+.how-it-works summary:hover {
+    color: var(--text-primary);
+}
+
+.how-it-works[open] summary {
+    border-bottom: 1px solid var(--border);
+}
+
+#how-it-works-content {
+    padding: 0.75rem;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+#how-it-works-content p {
+    margin-bottom: 0.6rem;
+}
+
+#how-it-works-content h4 {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0.6rem 0 0.3rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.adjacency-matrix {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.7rem;
+    margin-top: 0.3rem;
+}
+
+.adjacency-matrix th,
+.adjacency-matrix td {
+    padding: 0.2rem 0.3rem;
+    text-align: center;
+    border: 1px solid var(--border);
+    min-width: 1.8em;
+}
+
+.adjacency-matrix th {
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 0.65rem;
+    white-space: nowrap;
+}
+
+.adjacency-matrix td.compat {
+    background: rgba(39, 174, 96, 0.2);
+    color: var(--success);
+}
+
+.adjacency-matrix td.incompat {
+    background: transparent;
+    color: var(--text-muted);
+}
+
+.matrix-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 3px;
+    vertical-align: middle;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.matrix-note {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 0.4rem;
+}

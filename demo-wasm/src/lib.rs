@@ -6,12 +6,14 @@ use rand::SeedableRng;
 
 mod tilesets;
 mod topology_2d;
+mod topology_3d;
 
-use tilesets::{DungeonRules, TerrainRules};
+use tilesets::{DungeonRules, ForestVoxelRules, TerrainRules, TerrainVoxelRules, VillageVoxelRules};
 use topology_2d::Grid2D;
+use topology_3d::Grid3D;
 
 // ---------------------------------------------------------------------------
-// Full solve
+// Full solve (2D)
 // ---------------------------------------------------------------------------
 
 /// Generates a fully solved WFC grid and returns a flat array of tile states.
@@ -84,7 +86,7 @@ pub fn generate(
 }
 
 // ---------------------------------------------------------------------------
-// Timed generation
+// Timed generation (2D)
 // ---------------------------------------------------------------------------
 
 /// Like `generate`, but also returns timing information as a JSON string.
@@ -132,7 +134,7 @@ pub fn generate_timed(
 }
 
 // ---------------------------------------------------------------------------
-// Step-through solver
+// Step-through solver (2D)
 // ---------------------------------------------------------------------------
 
 enum SolverVariant {
@@ -276,6 +278,279 @@ impl StepSolver {
 }
 
 // ---------------------------------------------------------------------------
+// Full solve (3D)
+// ---------------------------------------------------------------------------
+
+#[wasm_bindgen]
+pub fn generate_3d(
+    width: usize,
+    height: usize,
+    depth: usize,
+    seed: u64,
+    tileset_3d: &str,
+    wrapping: bool,
+    propagator: &str,
+    heuristic: &str,
+    backtrack_mode: &str,
+    backtrack_param: usize,
+) -> Result<Vec<u8>, JsValue> {
+    let grid = Grid3D {
+        width,
+        height,
+        depth,
+        wrapping,
+    };
+
+    let prop = match propagator {
+        "ac4" => PropagatorKind::Ac4,
+        _ => PropagatorKind::Ac3,
+    };
+    let heur = match heuristic {
+        "shannon" => Heuristic::ShannonEntropy,
+        _ => Heuristic::MinCount,
+    };
+    let bt = match backtrack_mode {
+        "restart" => BacktrackStrategy::Restart {
+            max_restarts: backtrack_param,
+        },
+        "chronological" => BacktrackStrategy::Chronological {
+            max_depth: backtrack_param,
+        },
+        _ => BacktrackStrategy::None,
+    };
+
+    let config = SolverConfig::new()
+        .propagator(prop)
+        .heuristic(heur)
+        .backtrack(bt);
+
+    let mut rng = SmallRng::seed_from_u64(seed);
+
+    match tileset_3d {
+        "forest" => {
+            let rules = ForestVoxelRules;
+            let mut solver = WfcSolver::new(grid, &rules, config)
+                .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+            let result = solver
+                .solve(&mut rng)
+                .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+            Ok(result.states().iter().map(|&s| s as u8).collect())
+        }
+        "village" => {
+            let rules = VillageVoxelRules;
+            let mut solver = WfcSolver::new(grid, &rules, config)
+                .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+            let result = solver
+                .solve(&mut rng)
+                .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+            Ok(result.states().iter().map(|&s| s as u8).collect())
+        }
+        _ => {
+            // terrain_3d
+            let rules = TerrainVoxelRules;
+            let mut solver = WfcSolver::new(grid, &rules, config)
+                .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+            let result = solver
+                .solve(&mut rng)
+                .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+            Ok(result.states().iter().map(|&s| s as u8).collect())
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Timed generation (3D)
+// ---------------------------------------------------------------------------
+
+#[wasm_bindgen]
+pub fn generate_3d_timed(
+    width: usize,
+    height: usize,
+    depth: usize,
+    seed: u64,
+    tileset_3d: &str,
+    wrapping: bool,
+    propagator: &str,
+    heuristic: &str,
+    backtrack_mode: &str,
+    backtrack_param: usize,
+) -> Result<JsValue, JsValue> {
+    let window = web_sys::window().unwrap();
+    let perf = window.performance().unwrap();
+
+    let start = perf.now();
+    let states = generate_3d(
+        width,
+        height,
+        depth,
+        seed,
+        tileset_3d,
+        wrapping,
+        propagator,
+        heuristic,
+        backtrack_mode,
+        backtrack_param,
+    )?;
+    let elapsed = perf.now() - start;
+
+    let states_str: String = states
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    let json = format!(
+        r#"{{"states":[{states_str}],"elapsed_ms":{elapsed:.2},"width":{width},"height":{height},"depth":{depth}}}"#,
+    );
+
+    Ok(JsValue::from_str(&json))
+}
+
+// ---------------------------------------------------------------------------
+// Step-through solver (3D)
+// ---------------------------------------------------------------------------
+
+enum SolverVariant3D {
+    Terrain(WfcSolver<Grid3D>),
+    Forest(WfcSolver<Grid3D>),
+    Village(WfcSolver<Grid3D>),
+}
+
+#[wasm_bindgen]
+pub struct StepSolver3D {
+    inner: SolverVariant3D,
+    width: usize,
+    height: usize,
+    depth: usize,
+    rng: SmallRng,
+    tileset: String,
+    states: Vec<u8>,
+}
+
+#[wasm_bindgen]
+impl StepSolver3D {
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        width: usize,
+        height: usize,
+        depth: usize,
+        seed: u64,
+        tileset_3d: &str,
+        wrapping: bool,
+        propagator: &str,
+        heuristic: &str,
+    ) -> Result<StepSolver3D, JsValue> {
+        let grid = Grid3D {
+            width,
+            height,
+            depth,
+            wrapping,
+        };
+        let prop = match propagator {
+            "ac4" => PropagatorKind::Ac4,
+            _ => PropagatorKind::Ac3,
+        };
+        let heur = match heuristic {
+            "shannon" => Heuristic::ShannonEntropy,
+            _ => Heuristic::MinCount,
+        };
+        let config = SolverConfig::new().propagator(prop).heuristic(heur);
+
+        let rng = SmallRng::seed_from_u64(seed);
+
+        let states = vec![255u8; width * height * depth];
+
+        let inner = match tileset_3d {
+            "forest" => {
+                let rules = ForestVoxelRules;
+                let solver = WfcSolver::new(grid, &rules, config)
+                    .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+                SolverVariant3D::Forest(solver)
+            }
+            "village" => {
+                let rules = VillageVoxelRules;
+                let solver = WfcSolver::new(grid, &rules, config)
+                    .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+                SolverVariant3D::Village(solver)
+            }
+            _ => {
+                let rules = TerrainVoxelRules;
+                let solver = WfcSolver::new(grid, &rules, config)
+                    .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+                SolverVariant3D::Terrain(solver)
+            }
+        };
+
+        Ok(StepSolver3D {
+            inner,
+            width,
+            height,
+            depth,
+            rng,
+            tileset: tileset_3d.to_string(),
+            states,
+        })
+    }
+
+    pub fn step(&mut self) -> String {
+        let result = match &mut self.inner {
+            SolverVariant3D::Terrain(s) => s.step(&mut self.rng),
+            SolverVariant3D::Forest(s) => s.step(&mut self.rng),
+            SolverVariant3D::Village(s) => s.step(&mut self.rng),
+        };
+        match result {
+            StepResult::Collapsed { cell, state } => {
+                self.states[cell] = state as u8;
+                format!(r#"{{"type":"collapsed","cell":{cell},"state":{state}}}"#)
+            }
+            StepResult::Contradiction { cell } => {
+                format!(r#"{{"type":"contradiction","cell":{cell}}}"#)
+            }
+            StepResult::Complete => r#"{"type":"complete"}"#.to_string(),
+        }
+    }
+
+    pub fn get_current_state(&self) -> Vec<u8> {
+        self.states.clone()
+    }
+
+    pub fn get_color(&self, state: u8) -> String {
+        match self.tileset.as_str() {
+            "forest" => tilesets::voxel_forest_color(state as usize).to_string(),
+            "village" => tilesets::voxel_village_color(state as usize).to_string(),
+            _ => tilesets::voxel_terrain_color(state as usize).to_string(),
+        }
+    }
+
+    pub fn get_state_name(&self, state: u8) -> String {
+        match self.tileset.as_str() {
+            "forest" => tilesets::voxel_forest_name(state as usize).to_string(),
+            "village" => tilesets::voxel_village_name(state as usize).to_string(),
+            _ => tilesets::voxel_terrain_name(state as usize).to_string(),
+        }
+    }
+
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    pub fn height(&self) -> usize {
+        self.height
+    }
+
+    pub fn depth(&self) -> usize {
+        self.depth
+    }
+
+    pub fn num_states(&self) -> usize {
+        match self.tileset.as_str() {
+            "forest" => 8,
+            "village" => 11,
+            _ => 6,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Standalone color / name helpers
 // ---------------------------------------------------------------------------
 
@@ -300,9 +575,39 @@ pub fn get_dungeon_name(state: u8) -> String {
 }
 
 #[wasm_bindgen]
+pub fn get_voxel_color(tileset: &str, state: u8) -> String {
+    match tileset {
+        "forest" => tilesets::voxel_forest_color(state as usize).to_string(),
+        "village" => tilesets::voxel_village_color(state as usize).to_string(),
+        _ => tilesets::voxel_terrain_color(state as usize).to_string(),
+    }
+}
+
+#[wasm_bindgen]
+pub fn get_voxel_name(tileset: &str, state: u8) -> String {
+    match tileset {
+        "forest" => tilesets::voxel_forest_name(state as usize).to_string(),
+        "village" => tilesets::voxel_village_name(state as usize).to_string(),
+        _ => tilesets::voxel_terrain_name(state as usize).to_string(),
+    }
+}
+
+#[wasm_bindgen]
+pub fn get_voxel_num_states(tileset: &str) -> usize {
+    match tileset {
+        "forest" => 8,
+        "village" => 11,
+        _ => 6,
+    }
+}
+
+#[wasm_bindgen]
 pub fn get_num_states(tileset: &str) -> usize {
     match tileset {
         "dungeon" => 5,
+        "terrain_3d" => 6,
+        "forest" => 8,
+        "village" => 11,
         _ => 7,
     }
 }
