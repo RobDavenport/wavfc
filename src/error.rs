@@ -17,17 +17,17 @@ impl fmt::Display for Contradiction {
 
 /// Errors returned by the WFC solver.
 #[derive(Debug, Clone)]
-pub enum WfcError {
+pub enum WfcError<const W: usize = 2> {
     /// A contradiction was reached and could not be resolved.
     Contradiction {
         /// Details about where the contradiction occurred.
         contradiction: Contradiction,
         /// The partial solver state at the time of contradiction (possibilities per cell).
-        partial_state: alloc::vec::Vec<crate::bitset::BitSet128>,
+        partial_state: alloc::vec::Vec<crate::bitset::BitSet<W>>,
         /// Backtrack depth reached before giving up (0 if backtracking disabled).
         backtrack_depth: usize,
     },
-    /// The number of states exceeds BitSet128 capacity (128).
+    /// The number of states exceeds BitSet capacity.
     TooManyStates {
         /// The number of states that was requested.
         requested: usize,
@@ -43,7 +43,7 @@ pub enum WfcError {
     },
 }
 
-impl fmt::Display for WfcError {
+impl<const W: usize> fmt::Display for WfcError<W> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Contradiction {

@@ -515,3 +515,97 @@ fn eq_and_ne() {
     assert_eq!(a, b);
     assert_ne!(a, c);
 }
+
+// ===========================================================================
+// BitSet256 tests
+// ===========================================================================
+
+use wavfc::BitSet256;
+
+#[test]
+fn bitset256_full_200() {
+    let bs = BitSet256::full(200);
+    assert_eq!(bs.count_ones(), 200);
+    for i in 0..200 {
+        assert!(bs.test(i), "bit {i} should be set");
+    }
+    for i in 200..256 {
+        assert!(!bs.test(i), "bit {i} should be clear");
+    }
+}
+
+#[test]
+fn bitset256_set_test_above_128() {
+    let mut bs = BitSet256::new();
+    bs.set(130);
+    bs.set(200);
+    bs.set(255);
+    assert!(bs.test(130));
+    assert!(bs.test(200));
+    assert!(bs.test(255));
+    assert!(!bs.test(129));
+    assert!(!bs.test(131));
+    assert_eq!(bs.count_ones(), 3);
+}
+
+#[test]
+fn bitset256_iter_ones_across_four_words() {
+    let mut bs = BitSet256::new();
+    // Set one bit in each of the 4 words
+    bs.set(10);   // word 0
+    bs.set(70);   // word 1
+    bs.set(140);  // word 2
+    bs.set(210);  // word 3
+
+    let bits: Vec<usize> = bs.iter_ones().collect();
+    assert_eq!(bits, vec![10, 70, 140, 210]);
+}
+
+#[test]
+fn bitset256_full_256() {
+    let bs = BitSet256::full(256);
+    assert_eq!(bs.count_ones(), 256);
+    assert!(bs.test(0));
+    assert!(bs.test(127));
+    assert!(bs.test(128));
+    assert!(bs.test(255));
+}
+
+#[test]
+fn bitset256_and_not() {
+    let a = BitSet256::full(200);
+    let b = BitSet256::full(100);
+    let c = a.and_not(&b);
+    assert_eq!(c.count_ones(), 100);
+    assert!(!c.test(50));
+    assert!(c.test(150));
+}
+
+#[test]
+fn bitset256_first_one_high_word() {
+    let mut bs = BitSet256::new();
+    bs.set(200);
+    assert_eq!(bs.first_one(), Some(200));
+}
+
+#[test]
+fn bitset256_clear_and_singleton() {
+    let mut bs = BitSet256::new();
+    bs.set(250);
+    assert!(bs.is_singleton());
+    bs.clear(250);
+    assert!(bs.is_empty());
+}
+
+// Test BitSet<1> (64-bit)
+#[test]
+fn bitset_1_word() {
+    use wavfc::BitSet;
+    let mut bs = BitSet::<1>::new();
+    assert_eq!(BitSet::<1>::MAX_BITS, 64);
+    bs.set(63);
+    assert!(bs.test(63));
+    assert_eq!(bs.count_ones(), 1);
+    let full = BitSet::<1>::full(64);
+    assert_eq!(full.count_ones(), 64);
+}

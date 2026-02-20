@@ -3,7 +3,7 @@
 //! Provides strategies for choosing which uncollapsed cell to collapse next.
 //! The choice of heuristic affects both solve speed and output quality.
 
-use crate::bitset::BitSet128;
+use crate::bitset::BitSet;
 use rand_core::RngCore;
 
 /// Cell selection heuristic.
@@ -66,8 +66,8 @@ pub fn select_min_count(entropy_cache: &[u32], rng: &mut impl RngCore) -> Option
 /// better-distributed results than simple minimum count, at higher computational cost.
 ///
 /// Returns `None` if all cells are collapsed.
-pub fn select_shannon(
-    possibilities: &[BitSet128],
+pub fn select_shannon<const W: usize>(
+    possibilities: &[BitSet<W>],
     weights: &[f64],
     rng: &mut impl RngCore,
 ) -> Option<usize> {
@@ -114,7 +114,7 @@ pub fn select_shannon(
 }
 
 /// Computes the Shannon entropy for a single cell given its possibilities and weights.
-fn shannon_entropy(poss: &BitSet128, weights: &[f64]) -> f64 {
+fn shannon_entropy<const W: usize>(poss: &BitSet<W>, weights: &[f64]) -> f64 {
     let mut sum_weights = 0.0;
     let mut sum_w_log_w = 0.0;
 

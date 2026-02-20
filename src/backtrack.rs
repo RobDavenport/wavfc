@@ -5,7 +5,7 @@
 
 use alloc::vec::Vec;
 
-use crate::bitset::BitSet128;
+use crate::bitset::BitSet;
 
 /// Backtracking strategy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -27,25 +27,25 @@ pub enum BacktrackStrategy {
 
 /// A saved snapshot of solver state for backtracking.
 #[derive(Clone)]
-pub(crate) struct Snapshot {
+pub(crate) struct Snapshot<const W: usize = 2> {
     /// The possibilities at the time of the snapshot.
-    pub possibilities: Vec<BitSet128>,
+    pub possibilities: Vec<BitSet<W>>,
     /// The entropy cache at the time of the snapshot.
     pub entropy_cache: Vec<u32>,
     /// The cell that was being collapsed.
     pub collapsed_cell: usize,
     /// Which states have already been tried for this cell.
-    pub tried_states: BitSet128,
+    pub tried_states: BitSet<W>,
     /// The collapsed count at the time of the snapshot.
     pub collapsed_count: usize,
 }
 
 /// Stack of snapshots for chronological backtracking.
-pub(crate) struct SnapshotStack {
-    snapshots: Vec<Snapshot>,
+pub(crate) struct SnapshotStack<const W: usize = 2> {
+    snapshots: Vec<Snapshot<W>>,
 }
 
-impl SnapshotStack {
+impl<const W: usize> SnapshotStack<W> {
     /// Creates a new empty snapshot stack.
     pub fn new() -> Self {
         Self {
@@ -59,10 +59,10 @@ impl SnapshotStack {
     /// and which states have been tried so far.
     pub fn push(
         &mut self,
-        possibilities: &[BitSet128],
+        possibilities: &[BitSet<W>],
         entropy_cache: &[u32],
         collapsed_cell: usize,
-        tried_states: BitSet128,
+        tried_states: BitSet<W>,
         collapsed_count: usize,
     ) {
         self.snapshots.push(Snapshot {
@@ -78,7 +78,7 @@ impl SnapshotStack {
     ///
     /// Returns the snapshot so the solver can try the next untried state
     /// for the collapsed cell.
-    pub fn pop(&mut self) -> Option<Snapshot> {
+    pub fn pop(&mut self) -> Option<Snapshot<W>> {
         self.snapshots.pop()
     }
 

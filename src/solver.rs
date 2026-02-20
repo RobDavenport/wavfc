@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use rand_core::RngCore;
 
 use crate::backtrack::{BacktrackStrategy, SnapshotStack};
-use crate::bitset::BitSet128;
+use crate::bitset::BitSet;
 use crate::config::SolverConfig;
 use crate::constraint::{GlobalConstraint, SolverState};
 use crate::entropy::{self, Heuristic};
@@ -68,7 +68,9 @@ pub enum StepResult {
 
 /// The core Wave Function Collapse solver.
 ///
-/// Generic over the [`Topology`] to support arbitrary world structures.
+/// Generic over the [`Topology`] to support arbitrary world structures,
+/// and over the bitset width `W` (in 64-bit words) to support different
+/// maximum state counts. Default `W = 2` supports up to 128 states.
 ///
 /// # Usage
 ///
@@ -76,20 +78,25 @@ pub enum StepResult {
 /// let solver = WfcSolver::new(topology, &rules, config)?;
 /// let result = solver.solve(&mut rng)?;
 /// ```
-pub struct WfcSolver<T: Topology> {
+pub struct WfcSolver<T: Topology, const W: usize = 2> {
     topo: T,
-    compat: CompatibilityTable,
-    possibilities: Vec<BitSet128>,
+    compat: CompatibilityTable<W>,
+    possibilities: Vec<BitSet<W>>,
     entropy_cache: Vec<u32>,
     collapsed_count: usize,
     propagator: Propagator,
     config: SolverConfig,
-    snapshots: SnapshotStack,
+    snapshots: SnapshotStack<W>,
     iterations: usize,
 }
 
+/// Convenience constructors for the default bitset width (128-bit / 2 words).
+///
+/// Using `WfcSolver::new(topo, rules, config)` automatically selects `W = 2`,
+/// supporting up to 128 states. For more states, use
+/// `WfcSolver::<_, 4>::new_with(topo, rules, config)` for up to 256 states, etc.
 impl<T: Topology> WfcSolver<T> {
-    /// Creates a new WFC solver.
+    /// Creates a new WFC solver with the default 128-state capacity.
     ///
     /// # Errors
     ///
@@ -100,17 +107,36 @@ impl<T: Topology> WfcSolver<T> {
         rules: &R,
         config: SolverConfig,
     ) -> Result<Self, WfcError> {
+        Self::new_with(topo, rules, config)
+    }
+}
+
+impl<T: Topology, const W: usize> WfcSolver<T, W> {
+    /// Creates a new WFC solver with a custom bitset width.
+    ///
+    /// Use `WfcSolver::<_, W>::new_with(topo, rules, config)` to specify the
+    /// number of 64-bit words. For example, `W = 4` supports up to 256 states.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WfcError::TooManyStates`] if `rules.num_states() > W * 64`.
+    /// Returns [`WfcError::InvalidPin`] if any seed references an invalid cell or state.
+    pub fn new_with<R: AdjacencyRules<Direction = T::Direction>>(
+        topo: T,
+        rules: &R,
+        config: SolverConfig,
+    ) -> Result<Self, WfcError<W>> {
         let num_states = rules.num_states();
-        if num_states > BitSet128::MAX_BITS {
+        if num_states > BitSet::<W>::MAX_BITS {
             return Err(WfcError::TooManyStates {
                 requested: num_states,
-                max: BitSet128::MAX_BITS,
+                max: BitSet::<W>::MAX_BITS,
             });
         }
 
         let num_cells = topo.num_cells();
-        let compat = CompatibilityTable::new(&topo, rules);
-        let full = BitSet128::full(num_states);
+        let compat = CompatibilityTable::<W>::new(&topo, rules);
+        let full = BitSet::<W>::full(num_states);
         let possibilities = vec![full; num_cells];
         let entropy_cache = vec![num_states as u32; num_cells];
 
@@ -146,7 +172,7 @@ impl<T: Topology> WfcSolver<T> {
     ///
     /// Returns [`WfcError::InvalidPin`] if the cell or state is out of range,
     /// or if the state is not currently possible for the cell.
-    pub fn pin(&mut self, cell: usize, state: usize) -> Result<(), WfcError> {
+    pub fn pin(&mut self, cell: usize, state: usize) -> Result<(), WfcError<W>> {
         if cell >= self.topo.num_cells() || state >= self.compat.num_states() {
             return Err(WfcError::InvalidPin { cell, state });
         }
@@ -157,7 +183,7 @@ impl<T: Topology> WfcSolver<T> {
 
         // Collect removed states
         let old = self.possibilities[cell];
-        let mut only = BitSet128::new();
+        let mut only = BitSet::<W>::new();
         only.set(state);
         self.possibilities[cell] = only;
 
@@ -186,9 +212,9 @@ impl<T: Topology> WfcSolver<T> {
     /// # Errors
     ///
     /// Returns [`WfcError::Contradiction`] if the puzzle cannot be solved.
-    pub fn solve(&mut self, rng: &mut impl RngCore) -> Result<SolveResult, WfcError> {
+    pub fn solve(&mut self, rng: &mut impl RngCore) -> Result<SolveResult, WfcError<W>> {
         let mut observer = NoOpObserver;
-        let constraints: &[&NoConstraint<T>] = &[];
+        let constraints: &[&NoConstraint<T, W>] = &[];
         self.solve_with(rng, &mut observer, constraints)
     }
 
@@ -201,12 +227,12 @@ impl<T: Topology> WfcSolver<T> {
     ///
     /// Returns [`WfcError::Contradiction`] if the puzzle cannot be solved within
     /// the configured backtracking limits.
-    pub fn solve_with<O: Observer<T>, G: GlobalConstraint<T>>(
+    pub fn solve_with<O: Observer<T>, G: GlobalConstraint<T, W>>(
         &mut self,
         rng: &mut impl RngCore,
         observer: &mut O,
         constraints: &[&G],
-    ) -> Result<SolveResult, WfcError> {
+    ) -> Result<SolveResult, WfcError<W>> {
         match self.config.backtrack {
             BacktrackStrategy::None => self.solve_no_backtrack(rng, observer, constraints),
             BacktrackStrategy::Restart { max_restarts } => {
@@ -233,7 +259,7 @@ impl<T: Topology> WfcSolver<T> {
 
         // Propagate
         let old = self.possibilities[cell];
-        let mut only = BitSet128::new();
+        let mut only = BitSet::<W>::new();
         only.set(state);
         self.possibilities[cell] = only;
         self.entropy_cache[cell] = 1;
@@ -265,7 +291,7 @@ impl<T: Topology> WfcSolver<T> {
         rng: &mut impl RngCore,
         validate: impl Fn(&[usize]) -> bool,
         max_retries: usize,
-    ) -> Result<SolveResult, WfcError> {
+    ) -> Result<SolveResult, WfcError<W>> {
         let num_states = self.compat.num_states();
         for _ in 0..=max_retries {
             self.reset(num_states);
@@ -354,7 +380,7 @@ impl<T: Topology> WfcSolver<T> {
     /// Resets the solver state for restart backtracking.
     fn reset(&mut self, num_states: usize) {
         let num_cells = self.topo.num_cells();
-        let full = BitSet128::full(num_states);
+        let full = BitSet::<W>::full(num_states);
         for p in self.possibilities.iter_mut() {
             *p = full;
         }
@@ -370,12 +396,12 @@ impl<T: Topology> WfcSolver<T> {
     }
 
     /// Solve loop without backtracking.
-    fn solve_no_backtrack<O: Observer<T>, G: GlobalConstraint<T>>(
+    fn solve_no_backtrack<O: Observer<T>, G: GlobalConstraint<T, W>>(
         &mut self,
         rng: &mut impl RngCore,
         observer: &mut O,
         constraints: &[&G],
-    ) -> Result<SolveResult, WfcError> {
+    ) -> Result<SolveResult, WfcError<W>> {
         loop {
             // Observe
             let cell = match self.observe(rng) {
@@ -386,7 +412,7 @@ impl<T: Topology> WfcSolver<T> {
             // Collapse
             let state = self.collapse(cell, rng);
             let old = self.possibilities[cell];
-            let mut only = BitSet128::new();
+            let mut only = BitSet::<W>::new();
             only.set(state);
             self.possibilities[cell] = only;
             self.entropy_cache[cell] = 1;
@@ -422,13 +448,13 @@ impl<T: Topology> WfcSolver<T> {
     }
 
     /// Solve loop with restart backtracking.
-    fn solve_with_restarts<O: Observer<T>, G: GlobalConstraint<T>>(
+    fn solve_with_restarts<O: Observer<T>, G: GlobalConstraint<T, W>>(
         &mut self,
         rng: &mut impl RngCore,
         observer: &mut O,
         constraints: &[&G],
         max_restarts: usize,
-    ) -> Result<SolveResult, WfcError> {
+    ) -> Result<SolveResult, WfcError<W>> {
         let num_states = self.compat.num_states();
         let mut last_error = None;
 
@@ -459,13 +485,13 @@ impl<T: Topology> WfcSolver<T> {
     }
 
     /// Solve loop with chronological backtracking.
-    fn solve_chronological<O: Observer<T>, G: GlobalConstraint<T>>(
+    fn solve_chronological<O: Observer<T>, G: GlobalConstraint<T, W>>(
         &mut self,
         rng: &mut impl RngCore,
         observer: &mut O,
         constraints: &[&G],
         max_depth: usize,
-    ) -> Result<SolveResult, WfcError> {
+    ) -> Result<SolveResult, WfcError<W>> {
         loop {
             // Observe
             let cell = match self.observe(rng) {
@@ -474,7 +500,7 @@ impl<T: Topology> WfcSolver<T> {
             };
 
             // Save snapshot before collapsing
-            let mut tried = BitSet128::new();
+            let mut tried = BitSet::<W>::new();
             let state = self.collapse(cell, rng);
             tried.set(state);
 
@@ -490,7 +516,7 @@ impl<T: Topology> WfcSolver<T> {
 
             // Collapse
             let old = self.possibilities[cell];
-            let mut only = BitSet128::new();
+            let mut only = BitSet::<W>::new();
             only.set(state);
             self.possibilities[cell] = only;
             self.entropy_cache[cell] = 1;
@@ -529,12 +555,12 @@ impl<T: Topology> WfcSolver<T> {
     ///
     /// Returns `Ok(true)` if backtracking succeeded and solving can continue.
     /// Returns `Ok(false)` if no more backtrack options are available.
-    fn try_backtrack<O: Observer<T>, G: GlobalConstraint<T>>(
+    fn try_backtrack<O: Observer<T>, G: GlobalConstraint<T, W>>(
         &mut self,
         rng: &mut impl RngCore,
         observer: &mut O,
         constraints: &[&G],
-    ) -> Result<bool, WfcError> {
+    ) -> Result<bool, WfcError<W>> {
         while let Some(snapshot) = self.snapshots.pop() {
             observer.on_backtrack(self.snapshots.depth());
 
@@ -578,7 +604,7 @@ impl<T: Topology> WfcSolver<T> {
 
             // Collapse to the new state
             let old = self.possibilities[cell];
-            let mut only = BitSet128::new();
+            let mut only = BitSet::<W>::new();
             only.set(state);
             self.possibilities[cell] = only;
             self.entropy_cache[cell] = 1;
@@ -610,7 +636,7 @@ impl<T: Topology> WfcSolver<T> {
     }
 
     /// Collapses a cell choosing from a specific set of states (for backtracking).
-    fn collapse_from_set(&self, _cell: usize, available: &BitSet128, rng: &mut impl RngCore) -> usize {
+    fn collapse_from_set(&self, _cell: usize, available: &BitSet<W>, rng: &mut impl RngCore) -> usize {
         let weights = self.compat.weights();
         let mut total_weight = 0.0;
         for s in available.iter_ones() {
@@ -640,7 +666,7 @@ impl<T: Topology> WfcSolver<T> {
     ///
     /// Loops until convergence: after each constraint pass, if any possibilities
     /// were reduced, the removed states are propagated and constraints are re-checked.
-    fn enforce_constraints<G: GlobalConstraint<T>>(
+    fn enforce_constraints<G: GlobalConstraint<T, W>>(
         &mut self,
         constraints: &[&G],
     ) -> Result<(), Contradiction> {
@@ -650,7 +676,7 @@ impl<T: Topology> WfcSolver<T> {
 
         loop {
             // Snapshot the current possibilities before enforcing constraints
-            let snapshot: Vec<BitSet128> = self.possibilities.to_vec();
+            let snapshot: Vec<BitSet<W>> = self.possibilities.to_vec();
 
             let num_states = self.compat.num_states();
             {
@@ -720,10 +746,10 @@ impl<T: Topology> WfcSolver<T> {
 }
 
 /// A dummy global constraint that does nothing (used for type inference).
-struct NoConstraint<T: Topology>(core::marker::PhantomData<T>);
+struct NoConstraint<T: Topology, const W: usize>(core::marker::PhantomData<T>);
 
-impl<T: Topology> GlobalConstraint<T> for NoConstraint<T> {
-    fn enforce(&self, _state: &mut SolverState<'_, T>) -> Result<(), Contradiction> {
+impl<T: Topology, const W: usize> GlobalConstraint<T, W> for NoConstraint<T, W> {
+    fn enforce(&self, _state: &mut SolverState<'_, T, W>) -> Result<(), Contradiction> {
         Ok(())
     }
 }

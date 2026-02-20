@@ -9,7 +9,7 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::bitset::BitSet128;
+use crate::bitset::BitSet;
 use crate::error::Contradiction;
 use crate::rules::CompatibilityTable;
 use crate::topology::Topology;
@@ -40,12 +40,12 @@ impl Ac3Propagator {
     }
 
     /// Runs propagation from the given initial removals.
-    fn propagate(
+    fn propagate<const W: usize>(
         &mut self,
-        possibilities: &mut [BitSet128],
+        possibilities: &mut [BitSet<W>],
         entropy_cache: &mut [u32],
         topo: &impl Topology,
-        compat: &CompatibilityTable,
+        compat: &CompatibilityTable<W>,
         initial_stack: &[(usize, usize)],
     ) -> Result<(), Contradiction> {
         self.stack.clear();
@@ -58,7 +58,7 @@ impl Ac3Propagator {
 
                 // Compute the support set: what states are compatible with
                 // the current possibilities of `cell` when viewed from `neighbor`?
-                let mut support = BitSet128::new();
+                let mut support = BitSet::<W>::new();
                 for s in possibilities[cell].iter_ones() {
                     // s is a state still possible in `cell`.
                     // For each such state, what states does it allow in `neighbor`
@@ -115,10 +115,10 @@ pub(crate) struct Ac4Propagator {
 
 impl Ac4Propagator {
     /// Creates a new AC-4 propagator and initializes support counters.
-    fn new(
+    fn new<const W: usize>(
         topo: &impl Topology,
-        compat: &CompatibilityTable,
-        possibilities: &[BitSet128],
+        compat: &CompatibilityTable<W>,
+        possibilities: &[BitSet<W>],
     ) -> Self {
         let num_cells = topo.num_cells();
         let num_states = compat.num_states();
@@ -156,11 +156,11 @@ impl Ac4Propagator {
     }
 
     /// Reinitializes support counters (e.g., after backtrack restore).
-    fn reinitialize(
+    fn reinitialize<const W: usize>(
         &mut self,
         topo: &impl Topology,
-        compat: &CompatibilityTable,
-        possibilities: &[BitSet128],
+        compat: &CompatibilityTable<W>,
+        possibilities: &[BitSet<W>],
     ) {
         let num_cells = topo.num_cells();
         // Zero out
@@ -189,12 +189,12 @@ impl Ac4Propagator {
     }
 
     /// Runs propagation from the given initial removals.
-    fn propagate(
+    fn propagate<const W: usize>(
         &mut self,
-        possibilities: &mut [BitSet128],
+        possibilities: &mut [BitSet<W>],
         entropy_cache: &mut [u32],
         topo: &impl Topology,
-        compat: &CompatibilityTable,
+        compat: &CompatibilityTable<W>,
         initial_stack: &[(usize, usize)],
     ) -> Result<(), Contradiction> {
         self.stack.clear();
@@ -256,11 +256,11 @@ pub(crate) enum Propagator {
 
 impl Propagator {
     /// Creates a new propagator of the specified kind.
-    pub fn new(
+    pub fn new<const W: usize>(
         kind: PropagatorKind,
         topo: &impl Topology,
-        compat: &CompatibilityTable,
-        possibilities: &[BitSet128],
+        compat: &CompatibilityTable<W>,
+        possibilities: &[BitSet<W>],
     ) -> Self {
         match kind {
             PropagatorKind::Ac3 => Propagator::Ac3(Ac3Propagator::new()),
@@ -271,12 +271,12 @@ impl Propagator {
     /// Runs constraint propagation from the given initial removals.
     ///
     /// Returns `Err(Contradiction)` if any cell is reduced to zero possibilities.
-    pub fn propagate(
+    pub fn propagate<const W: usize>(
         &mut self,
-        possibilities: &mut [BitSet128],
+        possibilities: &mut [BitSet<W>],
         entropy_cache: &mut [u32],
         topo: &impl Topology,
-        compat: &CompatibilityTable,
+        compat: &CompatibilityTable<W>,
         stack: &[(usize, usize)],
     ) -> Result<(), Contradiction> {
         match self {
@@ -286,11 +286,11 @@ impl Propagator {
     }
 
     /// Reinitializes the propagator state (needed for AC-4 after backtrack restore).
-    pub fn reinitialize(
+    pub fn reinitialize<const W: usize>(
         &mut self,
         topo: &impl Topology,
-        compat: &CompatibilityTable,
-        possibilities: &[BitSet128],
+        compat: &CompatibilityTable<W>,
+        possibilities: &[BitSet<W>],
     ) {
         match self {
             Propagator::Ac3(_) => {

@@ -37,7 +37,7 @@ pub mod config;
 pub mod solver;
 
 // Re-export primary API
-pub use bitset::BitSet128;
+pub use bitset::{BitSet, BitSet128, BitSet256};
 pub use topology::Topology;
 pub use rules::AdjacencyRules;
 pub use error::{WfcError, Contradiction};

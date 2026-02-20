@@ -7,7 +7,7 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::bitset::BitSet128;
+use crate::bitset::BitSet;
 use crate::topology::Topology;
 
 /// Defines which states can be adjacent in which directions.
@@ -39,14 +39,14 @@ pub trait AdjacencyRules {
 ///
 /// This precomputation converts O(n) per-state compatibility checks into O(1) bitmask lookups
 /// during propagation.
-pub struct CompatibilityTable {
-    table: Vec<BitSet128>,
+pub struct CompatibilityTable<const W: usize = 2> {
+    table: Vec<BitSet<W>>,
     num_states: usize,
     num_directions: usize,
     weights: Vec<f64>,
 }
 
-impl CompatibilityTable {
+impl<const W: usize> CompatibilityTable<W> {
     /// Precomputes the compatibility table from a topology and adjacency rules.
     ///
     /// For every `(state, direction)` pair, builds a bitmask of all states that
@@ -57,7 +57,7 @@ impl CompatibilityTable {
     ) -> Self {
         let num_states = rules.num_states();
         let num_directions = topo.directions().len();
-        let mut table = vec![BitSet128::new(); num_states * num_directions];
+        let mut table = vec![BitSet::<W>::new(); num_states * num_directions];
         let mut weights = Vec::with_capacity(num_states);
 
         for state_a in 0..num_states {
@@ -83,7 +83,7 @@ impl CompatibilityTable {
     /// Returns the bitmask of states compatible with `state` when looking in
     /// direction `dir_index`.
     #[inline]
-    pub fn compatible_states(&self, state: usize, dir_index: usize) -> &BitSet128 {
+    pub fn compatible_states(&self, state: usize, dir_index: usize) -> &BitSet<W> {
         &self.table[state * self.num_directions + dir_index]
     }
 
