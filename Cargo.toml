@@ -2,5 +2,24 @@
 name = "wavfc"
 version = "0.1.0"
 edition = "2024"
+description = "A generic, dimension-agnostic Wave Function Collapse library"
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "wavfc"
+path = "src/lib.rs"
+
+[features]
+default = []
+std = []
 
 [dependencies]
+rand_core = { version = "0.6", default-features = false }
+
+[dev-dependencies]
+rand = "0.8"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "propagation"
+harness = false
