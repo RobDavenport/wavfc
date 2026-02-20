@@ -54,6 +54,9 @@ jobs:
           cp demo-wasm/pkg/wavfc_demo_bg.wasm _site/pkg/
           touch _site/.nojekyll
 
+      - name: Validate site
+        run: bash demo-wasm/scripts/validate-site.sh _site
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
