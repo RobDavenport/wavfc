@@ -1,5 +1,6 @@
 use wasm_bindgen::prelude::*;
 use wavfc::*;
+use wavfc::constraint::GlobalConstraint;
 
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -319,29 +320,65 @@ pub fn generate_3d(
         _ => BacktrackStrategy::None,
     };
 
+    // For constrained tilesets, default to restart backtracking if user selected "none"
+    let constrained_bt = match bt {
+        BacktrackStrategy::None => BacktrackStrategy::Restart { max_restarts: 20 },
+        other => other,
+    };
+
     let config = SolverConfig::new()
         .propagator(prop)
         .heuristic(heur)
         .backtrack(bt);
 
+    let constrained_config = SolverConfig::new()
+        .propagator(prop)
+        .heuristic(heur)
+        .backtrack(constrained_bt);
+
     let mut rng = SmallRng::seed_from_u64(seed);
+
+    let total = width * height * depth;
 
     match tileset_3d {
         "forest" => {
+            let freq = FrequencyConstraint::builder()
+                .max_fraction(6, 0.03, total)   // Trunk: max 3%
+                .max_fraction(7, 0.08, total)   // Leaves: max 8%
+                .build();
+            let run = MaxRunConstraint::builder()
+                .max_run(6, 3)   // Trunk: max 3 consecutive
+                .max_run(7, 4)   // Leaves: max 4 consecutive
+                .build(8);
+            let constraints: &[&dyn GlobalConstraint<Grid3D>] = &[&freq, &run];
             let rules = ForestVoxelRules;
-            let mut solver = WfcSolver::new(grid, &rules, config)
+            let mut solver = WfcSolver::new(grid, &rules, constrained_config)
                 .map_err(|e| JsValue::from_str(&format!("{e}")))?;
             let result = solver
-                .solve(&mut rng)
+                .solve_with(&mut rng, &mut NoOpObserver, constraints)
                 .map_err(|e| JsValue::from_str(&format!("{e}")))?;
             Ok(result.states().iter().map(|&s| s as u8).collect())
         }
         "village" => {
+            let freq = FrequencyConstraint::builder()
+                .max_fraction(6, 0.03, total)   // Trunk
+                .max_fraction(7, 0.06, total)   // Leaves
+                .max_fraction(8, 0.06, total)   // Wall
+                .max_fraction(9, 0.04, total)   // Floor
+                .max_fraction(10, 0.03, total)  // Roof
+                .build();
+            let run = MaxRunConstraint::builder()
+                .max_run(6, 3)    // Trunk
+                .max_run(7, 4)    // Leaves
+                .max_run(8, 4)    // Wall
+                .max_run(9, 3)    // Floor
+                .build(11);
+            let constraints: &[&dyn GlobalConstraint<Grid3D>] = &[&freq, &run];
             let rules = VillageVoxelRules;
-            let mut solver = WfcSolver::new(grid, &rules, config)
+            let mut solver = WfcSolver::new(grid, &rules, constrained_config)
                 .map_err(|e| JsValue::from_str(&format!("{e}")))?;
             let result = solver
-                .solve(&mut rng)
+                .solve_with(&mut rng, &mut NoOpObserver, constraints)
                 .map_err(|e| JsValue::from_str(&format!("{e}")))?;
             Ok(result.states().iter().map(|&s| s as u8).collect())
         }

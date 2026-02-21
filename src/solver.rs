@@ -267,7 +267,7 @@ impl<T: Topology, const W: usize> WfcSolver<T, W> {
     ///
     /// Returns [`WfcError::Contradiction`] if the puzzle cannot be solved within
     /// the configured backtracking limits.
-    pub fn solve_with<O: Observer<T>, G: GlobalConstraint<T, W>>(
+    pub fn solve_with<O: Observer<T>, G: GlobalConstraint<T, W> + ?Sized>(
         &mut self,
         rng: &mut impl RngCore,
         observer: &mut O,
@@ -436,7 +436,7 @@ impl<T: Topology, const W: usize> WfcSolver<T, W> {
     }
 
     /// Solve loop without backtracking.
-    fn solve_no_backtrack<O: Observer<T>, G: GlobalConstraint<T, W>>(
+    fn solve_no_backtrack<O: Observer<T>, G: GlobalConstraint<T, W> + ?Sized>(
         &mut self,
         rng: &mut impl RngCore,
         observer: &mut O,
@@ -488,7 +488,7 @@ impl<T: Topology, const W: usize> WfcSolver<T, W> {
     }
 
     /// Solve loop with restart backtracking.
-    fn solve_with_restarts<O: Observer<T>, G: GlobalConstraint<T, W>>(
+    fn solve_with_restarts<O: Observer<T>, G: GlobalConstraint<T, W> + ?Sized>(
         &mut self,
         rng: &mut impl RngCore,
         observer: &mut O,
@@ -525,7 +525,7 @@ impl<T: Topology, const W: usize> WfcSolver<T, W> {
     }
 
     /// Solve loop with chronological backtracking.
-    fn solve_chronological<O: Observer<T>, G: GlobalConstraint<T, W>>(
+    fn solve_chronological<O: Observer<T>, G: GlobalConstraint<T, W> + ?Sized>(
         &mut self,
         rng: &mut impl RngCore,
         observer: &mut O,
@@ -595,7 +595,7 @@ impl<T: Topology, const W: usize> WfcSolver<T, W> {
     ///
     /// Returns `Ok(true)` if backtracking succeeded and solving can continue.
     /// Returns `Ok(false)` if no more backtrack options are available.
-    fn try_backtrack<O: Observer<T>, G: GlobalConstraint<T, W>>(
+    fn try_backtrack<O: Observer<T>, G: GlobalConstraint<T, W> + ?Sized>(
         &mut self,
         rng: &mut impl RngCore,
         observer: &mut O,
@@ -706,7 +706,7 @@ impl<T: Topology, const W: usize> WfcSolver<T, W> {
     ///
     /// Loops until convergence: after each constraint pass, if any possibilities
     /// were reduced, the removed states are propagated and constraints are re-checked.
-    fn enforce_constraints<G: GlobalConstraint<T, W>>(
+    fn enforce_constraints<G: GlobalConstraint<T, W> + ?Sized>(
         &mut self,
         constraints: &[&G],
     ) -> Result<(), Contradiction> {
